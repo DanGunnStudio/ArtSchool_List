@@ -100,7 +100,6 @@ pivot_longer(test_deg_longer_split, everything(), cols_vary = "slowest")
 #how to recombining with test_info?
 test_info_expanded <- cbind(test_info, test_deg_longer_split)
 
-d
 # #test code
 # degrees_longer <- as.data.frame(unlist(str_split(degrees, "\\.")))
 # degrees_longer <- as.data.frame(str_split_fixed(degrees_longer[,1], pattern=":", n=2))
