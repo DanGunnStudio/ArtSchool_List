@@ -46,4 +46,8 @@ docs/
 po/*~
 
 # RStudio Connect folder
+<<<<<<< HEAD
 rsconnect/
+=======
+rsconnect/
+>>>>>>> 1e1204c10283f1f4764e9e1317cf49d47229566e
