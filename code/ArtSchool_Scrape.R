@@ -121,10 +121,17 @@ test_set2 <- bind_cols(test_set2, tmp)
 test_set2 <- select(test_set2, -address.1)
 test_set2 <- test_set2 %>% relocate(any_of(c("streetaddress","city","state","zip")), .after=name)
 
+
+#left to do
 #parse type into helpful categories ?
 
 #test complete! Now to apply to the whole list.
+full_list <- apply(X= nasad_URL_tbl, FUN = nasad_f, MARGIN = 1)
+str(full_list)
+head(full_list)
 
-
+full_info <- lapply(full_list, subset_f) %>% 
+  data.table::rbindlist()
+head(full_info)
 
 
