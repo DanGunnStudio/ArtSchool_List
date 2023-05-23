@@ -126,9 +126,9 @@ test_set2 <- test_set2 %>% relocate(any_of(c("streetaddress","city","state","zip
 #parse type into helpful categories ?
 
 #test complete! Now to apply to the whole list.
-full_list <- apply(X= nasad_URL_tbl, FUN = nasad_f, MARGIN = 1)
-str(full_list)
-head(full_list)
+full_nodes <- apply(X= nasad_URL_tbl, FUN = nasad_f, MARGIN = 1)
+str(full_nodes)
+head(full_nodes)
 
 #selectors aren't specific enough as html class tags differ on different pages.
 subset_full_f <- function(x){
@@ -139,9 +139,65 @@ subset_full_f <- function(x){
 }
 #broward college as example why the class selectors are failing.
 nasad_web_full[27,]
-html_text(html_elements(full_list[[27]],"p:nth-child(5)"))
 
-full_info <- lapply(full_list, subset_full_f)  %>% 
+
+full_info <- lapply(full_nodes, subset_full_f)  %>% 
   data.table::rbindlist()
 head(full_info)
 str(full_info)
+
+#returns a full table of each heading and paragraph by school. Need to tidy.
+full_about <- full_info %>% 
+  group_by(school_name) %>%
+  filter(grepl('^a\\s|^an\\s|research university|state-supported|land-grant|college of arts and sciences|coeducational|Guildhall', text, ignore.case = TRUE)) %>%
+  rename(.,about = text)
+
+full_address_url <- full_info %>% 
+  group_by(school_name) %>%
+  filter(grepl('Web Site|^\\d|[A-Z]{2}\\s[0-9]{5}', text)) %>%
+  rename(.,address_url = text)
+
+full_accred <- full_info %>%
+  group_by(school_name) %>%
+  filter(grepl('Date of Initial Accreditation', text)) %>%
+  rename(.,address_url = text)
+
+full_school_type <- full_info %>% 
+  group_by(school_name) %>%
+  filter(grepl('Public|Private', text)) %>%
+  rename(.,school_type = text)
+
+full_degree_type <- full_info %>% 
+  group_by(school_name) %>%
+  filter(grepl('Bachelor|Certificate|Associate of|Associate in|Master|Transfer|Advanced Fine Art Program-4 years.', text)) %>%
+  rename(.,degree_type = text) 
+
+#ending up with some strange lengths because schools have multiple campuses with different degree offerings. There are 333 schools, but more campuses
+
+duplicated_campuses <- full_address_url$school_name[duplicated(full_address_url$school_name)] #30
+matching_values <- full_address_url %>% filter(school_name %in% duplicated_campuses)
+#showing 54 schools with multiple locations. We should have 54 schools with multiple degree types.
+
+duplicated_degrees <- full_degree_type$school_name[duplicated(full_degree_type$school_name)]
+length(duplicated_degrees) #now 32
+matching_deg_values <- full_degree_type %>% filter(school_name %in% duplicated_degrees)
+
+anti_join(full_address_url, full_degree_type)
+#who has multiple campuses but is missing from the degree listing? 
+
+full_degree_type %>% filter(school_name == "Rochester Institute of Technology")
+#no web site for university of south florida st. petersburg campus. Need to recycle adding or statement to address pull.
+#lengths now match.
+
+#combining address and degree_type
+full_df <- bind_cols(full_address_url, full_degree_type$degree_type)
+full_df_2 <- distinct(full_df)
+full_df_2 <- right_join(full_df, full_about)
+full_df_3 <- distinct(full_df_2)
+#still have some duplicates / addresses should be unique
+fails <-full_df_3[which(duplicated(full_df_3$address_url)),]
+
+
+
+
+
