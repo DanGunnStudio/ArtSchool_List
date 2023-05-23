@@ -130,8 +130,18 @@ full_list <- apply(X= nasad_URL_tbl, FUN = nasad_f, MARGIN = 1)
 str(full_list)
 head(full_list)
 
-full_info <- lapply(full_list, subset_f) %>% 
+#selectors aren't specific enough as html class tags differ on different pages.
+subset_full_f <- function(x){
+  school_name <- html_text(html_elements(x, "h2:nth-child(1)")) 
+  text <- html_text(html_elements(x, "h3 , p , h2"))
+  school_info <-data.frame(school_name, text)
+  return(school_info)
+}
+#broward college as example why the class selectors are failing.
+nasad_web_full[27,]
+html_text(html_elements(full_list[[27]],"p:nth-child(5)"))
+
+full_info <- lapply(full_list, subset_full_f)  %>% 
   data.table::rbindlist()
 head(full_info)
-
-
+str(full_info)
