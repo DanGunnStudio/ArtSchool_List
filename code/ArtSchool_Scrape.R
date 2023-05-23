@@ -193,11 +193,62 @@ full_degree_type %>% filter(school_name == "Rochester Institute of Technology")
 full_df <- bind_cols(full_address_url, full_degree_type$degree_type)
 full_df_2 <- distinct(full_df)
 full_df_2 <- right_join(full_df, full_about)
-full_df_3 <- distinct(full_df_2)
+full_df_3 <- distinct(full_df_2) %>% rename("degree_type" = ...3)
+
 #still have some duplicates / addresses should be unique
 fails <-full_df_3[which(duplicated(full_df_3$address_url)),]
 
+#expanding address and url and breaking out degrees and subjects.
+
+#str_split_fixed(full_df_3$address_url, pattern =".Web Site:", n=2) %>% as.data.frame()
+full_df_3 <- full_df_3 %>% 
+  separate(., address_url, 
+           into = c("street", "url"), 
+           sep =".Web Site:" )
+
+colnames(full_df_3)
+
+#extract address into street address, state, zip
+#zip
+full_df_3$zip <- str_extract(full_df_3$street, pattern="[0-9]{5}")
+#state
+full_df_3$state <- str_extract(full_df_3$street, "[A-Z]{2}")
 
 
+#separate out the degrees& subjects
+full_df_4 <- full_df_3 %>% 
+  mutate(degree= str_split_fixed(degree_type, pattern="\\.", n=Inf))
+#expand the data frame in the degree column
+full_df_5 <- do.call(data.frame, full_df_4)
+#pivot
+full_df_5 <- pivot_longer(full_df_5,
+                          cols=starts_with("degree."),
+                          names_to = NULL,
+                          values_to = "degree", 
+                          names_repair = "minimal", 
+                          values_drop_na=TRUE)
+
+#now delete rows with NA or empty 'degree-type's
+full_df_5 <- full_df_5[!(is.na(full_df_5$degree) | full_df_5$degree ==""), ]
+
+#expand degrees to break out subjects into columns
+full_df_6 <- full_df_5%>%
+  mutate(subject = str_split_fixed(degree,pattern=":|;|\\.", n=Inf))
+
+full_df_6 <- do.call(data.frame, full_df_6) %>% rename("tmp"= "subject.1")
+
+full_df_7 <- pivot_longer(full_df_6, 
+                          cols= starts_with("subject."), 
+                          names_to= NULL,
+                          values_to = "subject", 
+                          names_repair = "minimal", 
+                          values_drop_na=TRUE)
+full_df_7 <- full_df_7[!(is.na(full_df_7$subject) | full_df_7$subject ==""), ]
+
+#drop redundant degree column and change tmp
+full_df_7 <- full_df_7%>% select(-degree) %>% rename("degree" = "tmp")
 
 
+#need to remember the fails and investigate.
+#exporting to csv
+write.csv(full_df_7, file="data/cleaned_artschool_df.csv")
