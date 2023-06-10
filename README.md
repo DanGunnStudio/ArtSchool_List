@@ -1,10 +1,6 @@
 ---
-editor_options: 
-  markdown: 
-    wrap: 72
+#written by Dan Gunn 2023
 ---
-
-README
 
 # Art School Scrape
 
@@ -14,7 +10,7 @@ accredited art degree granting colleges and universities in the US.
 ## Data Dictionary - data/supercleaned_artschool_df.csv
 
 | Col1        | Col2                                                   | Col3        |
-|-------------|--------------------------------------------------------|-------------|
+|-----------------|---------------------------|---------------------------|
 | id          | index number                                           | (numeric)   |
 | school_name | name of the university                                 | (character) |
 | street      | street address for the university                      | (character) |
