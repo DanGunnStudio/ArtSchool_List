@@ -1,6 +1,3 @@
----
-#written by Dan Gunn 2023
----
 
 # Art School Scrape
 
