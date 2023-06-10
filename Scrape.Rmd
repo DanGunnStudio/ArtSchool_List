@@ -1,13 +1,23 @@
-#written by Dan Gunn 2023
-#Compile a list of all NASAD accredited art schools in the US. 
-#info from rayobyte on polite package
+---
+title: "Art School List Scrape"
+author: "Dan Gunn"
+date: "2023-06-09"
+output: html_document
+---
 
+```{r dependencies}
 library(tidyverse)
 library(rvest)
 library(polite)
 library(curl)
 library(broom)
+```
 
+## NASAD Art School List Scrape
+This code scrapes a database of accredited art schools in the US, and gathers them into a condensed table.
+After checking the robots.txt file, there is no prohibition to using this information. And it is publically available on the NASAD website. The goal is to build a searchable dashboard in Tableau for these schools and the information about what degrees they offer and what subjects they include. 
+
+```{r URL building}
 #reads in the names of the schools into session nasad_url
 nasad_url <- bow("https://nasad.arts-accredit.org/directory-lists/accredited-institutions/search/?institutionname=&city=&state=&country=&search=true", force = TRUE)
 info <- scrape(nasad_url) %>% 
@@ -29,13 +39,20 @@ nasad_URL_clean <- str_replace(nasad_nodes,"[?]","https://nasad.arts-accredit.or
 
 #list of search terms & inspecting
 nasad_URL_tbl <- as_tibble(nasad_URL_clean)
-str(nasad_URL_tbl)
 head(nasad_URL_tbl)
 
 #combined first scrape of list of URLs and school names + export to CSV
 nasad_web_full <- tibble(school_names, nasad_URL_clean)
 write.csv(nasad_web_full, "data/nasadwebfull.csv", row.names=FALSE)
+```
 
+## Writing functions and creating a test set.
+Creating a test subset of four entries to test out functions to apply to all of the scraped nodes to unpack the data.
+Function nasad_f uses the polite package to bow() and scrape() each page selecting the correct div
+
+Function subset_f uses html_text() and html_element() to translate the nodes into different categories of data.
+
+```{r function}
 #creating a smaller test set
 nasad_tbl_shrt <- nasad_URL_tbl[1:4,]
 
@@ -65,10 +82,13 @@ subset_f <- function(x){
 test_info <- lapply(test, subset_f) %>% 
   data.table::rbindlist()
 head(test_info)
+```
+## Parsing Degrees / Subjects
+Degrees are tricky because both the 9th or 10th child of p is the degree listing. I split out the degree types (4 year, associates, bachelors etc) on periods and colons.
+Use them as columns and then separate the degrees subjects below them.
 
-#NOTE: degrees are tricky because both the 9th or 10th child of p is the degree listing.
-#split out the degree types (4 year, associates, bachelors etc) on periods and colons.
-#use them as columns and then separate the degrees subjects below them.
+```{r degrees parsing}
+
 test_deg_longer <- test_info$degree %>% str_split_fixed(., pattern="\\.", n=Inf) %>% as.data.frame()
 #expanded degrees (subjects still in tow) recombined with schools
 test_info_combined <- cbind(test_info, test_deg_longer)
@@ -87,8 +107,10 @@ test_info_pivot1 <- test_info_pivot1[!(is.na(test_info_pivot1$degree_type) | tes
 
 #expand degrees to break out subjects into columns_degree.type.2
 test_set <- lapply(test_info_pivot1, function(x) {str_split_fixed(x,pattern=":|;", n=Inf)}) %>% as.data.frame()
+
 #change column name to degree to avoid the pivot
 colnames(test_set)[which(names(test_set) == 'degree_type.1')] <- 'degree'
+
 #pivoting to make tidy
 test_set2 <- pivot_longer(test_set, 
              cols= starts_with("degree_type."), 
@@ -96,19 +118,23 @@ test_set2 <- pivot_longer(test_set,
              values_to = "subject", 
              names_repair = "minimal", 
              values_drop_na=TRUE)
+
 #removing empty rows
 test_set2 <- test_set2[!(is.na(test_set2$subject) | test_set2$subject ==""), ]
+```
 
+Beginning to parse out the addresses, city, state, zip and URLs into separate columns.
 
+```{r addresses}
 #rename address 1 &2 
 #delete "Web.site" from address.1"
 test_set2$address.1 <- str_replace(test_set2$address.1, pattern =".Web Site", "")
 colnames(test_set2)[which(names(test_set2) == 'address.2')] <- 'url'
 #parse address into street address, city, state, zip
 #zip
-test_set2$zip <- str_extract(test_set2$address.1, "[0-9]{5}$")
+test_set2$zip <- str_extract(test_set2$address.1, "[0-9]{5}")
 #state
-test_set2$state <- str_extract(test_set2$address.1, "[A-Z]{2}$")
+test_set2$state <- str_extract(test_set2$address.1, "[A-Z]{2}")
 #delete zip and state
 test_set2$address.1 <- str_replace(test_set2$address.1, pattern =", [A-Z]{2} [0-9]{5}", "")
 #city (use first instance of comma from the end of the string)
@@ -121,7 +147,11 @@ test_set2 <- bind_cols(test_set2, tmp)
 test_set2 <- select(test_set2, -address.1)
 test_set2 <- test_set2 %>% relocate(any_of(c("streetaddress","city","state","zip")), .after=name)
 
+```
+## Scraping the whole list of URL's
+There are a couple of cases where there are multiple campuses that cause the CSS selector to be different and less specific. I had to adjust the approach to capture the whole list.
 
+```{r whole list}
 #test complete! Now to apply to the whole list.
 full_nodes <- apply(X= nasad_URL_tbl, FUN = nasad_f, MARGIN = 1)
 str(full_nodes)
@@ -137,12 +167,16 @@ subset_full_f <- function(x){
 #broward college as example why the class selectors are failing.
 nasad_web_full[27,]
 
-#applying to the full list
 full_info <- lapply(full_nodes, subset_full_f)  %>% 
   data.table::rbindlist()
 head(full_info)
 str(full_info)
 
+```
+
+Since the paragraphs scraped were less specific, I'm having to parse the divs by charactersitic text shapes. 
+
+```{r parsing}
 #returns a full table of each heading and paragraph by school. Need to tidy.
 full_about <- full_info %>% 
   group_by(school_name) %>%
@@ -169,8 +203,13 @@ full_degree_type <- full_info %>%
   filter(grepl('Bachelor|Certificate|Associate of|Associate in|Master|Transfer|Advanced Fine Art Program-4 years.', text)) %>%
   rename(.,degree_type = text) 
 
-#ending up with some strange lengths because schools have multiple campuses with different degree offerings. There are 333 schools, but more campuses
+```
+## Troubleshooting
 
+I'm ending up with some strange lengths because schools have multiple campuses with different degree offerings. There are 333 schools, but more campuses.
+Tests are showing 54 schools with multiple locations. We should have 54 schools with multiple degree types.
+
+```{r}
 duplicated_campuses <- full_address_url$school_name[duplicated(full_address_url$school_name)] #30
 matching_values <- full_address_url %>% filter(school_name %in% duplicated_campuses)
 #showing 54 schools with multiple locations. We should have 54 schools with multiple degree types.
@@ -185,7 +224,14 @@ anti_join(full_address_url, full_degree_type)
 full_degree_type %>% filter(school_name == "Rochester Institute of Technology")
 #no web site for university of south florida st. petersburg campus. Need to recycle adding or statement to address pull.
 #lengths now match.
+```
+##Removing duplicates
 
+No web site for university of south florida st. petersburg campus. Need to recycle adding or statement to address pull.
+Lengths now match.
+Next recombining the address and degree types.
+"fails" data frame contains the list of troublemakers.
+```{r}
 #combining address and degree_type
 full_df <- bind_cols(full_address_url, full_degree_type$degree_type)
 full_df_2 <- distinct(full_df)
@@ -194,8 +240,9 @@ full_df_3 <- distinct(full_df_2) %>% rename("degree_type" = ...3)
 
 #still have some duplicates / addresses should be unique
 fails <-full_df_3[which(duplicated(full_df_3$address_url)),]
-
-#expanding address and url and breaking out degrees and subjects.
+```
+Expanding address and urls 
+```{r}
 
 #str_split_fixed(full_df_3$address_url, pattern =".Web Site:", n=2) %>% as.data.frame()
 full_df_3 <- full_df_3 %>% 
@@ -207,17 +254,18 @@ colnames(full_df_3)
 
 #extract address into street address, state, zip
 #zip
-full_df_3$zip <- str_extract(full_df_3$street, pattern="[0-9]{5}$")
+full_df_3$zip <- str_extract(full_df_3$street, pattern="[0-9]{5}")
 #state
 full_df_3$state <- str_extract(full_df_3$street, "[A-Z]{2}")
-head(full_df_3$degree_type)
+```
+##Breaking out degrees and subjects. 
+Splitting degrees on periods and subjects on colons, semicolons and periods. 
+Pivoting to keep tidy.
 
+```{r}
 #separate out the degrees& subjects
-
 full_df_4 <- full_df_3 %>% 
   mutate(degree= str_split_fixed(degree_type, pattern="\\.", n=Inf))
-
-
 #expand the data frame in the degree column
 full_df_5 <- do.call(data.frame, full_df_4)
 #pivot
@@ -250,7 +298,12 @@ full_df_7 <- full_df_7%>% select(-degree) %>% rename("degree" = "tmp")
 
 #add back in missing school_type
 full_df_7 <-full_join(full_df_7, full_school_type, by= "school_name")
+```
+I'm writing out to CSV but need to remember the fails and investigate.
 
-#need to remember the fails and investigate.
+```{r write csv}
+
 #exporting to csv
 write.csv(full_df_7, file="data/cleaned_artschool_df.csv")
+```
+

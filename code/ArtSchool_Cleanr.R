@@ -3,7 +3,9 @@
 
 library(tidyverse)
 
+#read in CSV and inspect
 full_df <- read_csv("data/cleaned_artschool_df.csv")
+
 
 #STATES
 states <- unique(full_df$state)%>% sort()
@@ -33,14 +35,103 @@ full_df %>% filter(., is.na(state))  %>% print(n=60)
 
 #NA zips are all international programs except for University of North Florida
 full_df %>% filter(., is.na(zip))  %>% print(n=60)
-#fixing
+
+pattern_to_match <- "Kennesaw State University"
+updated_df <- updated_df %>%
+  mutate(state = ifelse(grepl(pattern_to_match, school_name), "GA", state))
+
+pattern_to_match <- "University of Texas at San Antonio"
+updated_df <- updated_df %>%
+  mutate(state = ifelse(grepl(pattern_to_match, school_name), "TX", state))
+
+pattern_to_match <- "Kent State University"
+updated_df <- updated_df %>%
+  mutate(state = ifelse(grepl(pattern_to_match, school_name), "OH", state))
+updated_df %>% filter(str_detect(school_name, "Kent")) %>% print(n=40)
+
+#not working
+pattern_to_match <- "Arizona State University (SPPA)"
+updated_df <- updated_df %>%
+  mutate(url = ifelse(grepl(pattern_to_match, school_name), "design.asu.edu", url))
+
+#brute force
+updated_df$url[224:228] <- "design.asu.edu"
+
+#fixing ZIPS
 pattern_to_match <- "University of North Florida"
 updated_df <- updated_df %>%
   mutate(zip = ifelse(grepl(pattern_to_match, school_name), "32246", zip))
 
+pattern_to_match <- "Chabot College"
+updated_df <- updated_df %>%
+  mutate(zip = ifelse(grepl(pattern_to_match, school_name), "94545", zip))
+
+pattern_to_match <- "Los Angeles Academy of Figurative Art"
+updated_df <- updated_df %>%
+  mutate(zip = ifelse(grepl(pattern_to_match, school_name), "91406", zip))
+
+pattern_to_match <- "University of Arizona"
+updated_df <- updated_df %>%
+  mutate(zip = ifelse(grepl(pattern_to_match, school_name), "85721", zip))
+
+pattern_to_match <- "Morehead State University"
+updated_df <- updated_df %>%
+  mutate(zip = ifelse(grepl(pattern_to_match, school_name), "40351", zip))
+
+pattern_to_match <- "Cleveland Institute of Art"
+updated_df <- updated_df %>%
+  mutate(zip = ifelse(grepl(pattern_to_match, school_name), "44106", zip))
+
+pattern_to_match <- "Stephen F. Austin State University"
+updated_df <- updated_df %>%
+  mutate(zip = ifelse(grepl(pattern_to_match, school_name), "75962", zip))
+
+pattern_to_match <- "Biola University"
+updated_df <- updated_df %>%
+  mutate(zip = ifelse(grepl(pattern_to_match, school_name), "90639", zip))
+
+pattern_to_match <- "Mississippi Valley State University"
+updated_df <- updated_df %>%
+  mutate(zip = ifelse(grepl(pattern_to_match, school_name), "38941", zip))
+
+pattern_to_match <- "West Valley College"
+updated_df <- updated_df %>%
+  mutate(zip = ifelse(grepl(pattern_to_match, school_name), "95070", zip))
+
+pattern_to_match <- "California State University"
+updated_df <- updated_df %>%
+  mutate(zip = ifelse(grepl(pattern_to_match, school_name), "91330", zip))
+
+pattern_to_match <- "Lawrence Technological University"
+updated_df <- updated_df %>%
+  mutate(zip = ifelse(grepl(pattern_to_match, school_name), "48075", zip))
+
+pattern_to_match <- "Jacksonville State University"
+updated_df <- updated_df %>%
+  mutate(zip = ifelse(grepl(pattern_to_match, school_name), "36265", zip))
+
+pattern_to_match <- "Cranbrook Academy of Art"
+updated_df <- updated_df %>%
+  mutate(zip = ifelse(grepl(pattern_to_match, school_name), "48303", zip))
+
+pattern_to_match <- "East Central College"
+updated_df <- updated_df %>%
+  mutate(zip = ifelse(grepl(pattern_to_match, school_name), "63084", zip))
+
+pattern_to_match <- "University of Nebraska Omaha"
+updated_df <- updated_df %>%
+  mutate(zip = ifelse(grepl(pattern_to_match, school_name), "68182", zip))
+
+updated_df %>% filter(str_detect(updated_df$street, "26265"))
+
 #NASAD doesn't list any schools in "DE" "HI" "NH" "NM". Confirmed via web search as well.
 index <- state.abb %in% states 
 state.abb[!index]
+
+#removing international programs
+updated_df <- updated_df %>% filter(!is.na(state))
+
+updated_df %>% filter(zip =="14000")
 
 #DEGREES
 full_df %>% filter(., is.na(degree))
@@ -148,9 +239,8 @@ updated_df %>% group_by(subject) %>% count()%>% arrange(desc(n)) %>%
 updated_df <- updated_df %>% 
   mutate(subject = str_replace(subject, pattern="Arts", replacement ="Art"))
 
-#i could condense more by throughing out what's in parentheses
+#i could condense more by throwing out what's in parentheses
 #but it would limit the information available to the searcher? Maybe it'd be best to limit
-
 updated_df %>% 
   mutate(subject = trimws(gsub("\\([^()]*\\)", "", subject))) %>% group_by(subject) %>% count()%>% arrange(desc(n)) %>%
   print(n=500)
@@ -163,5 +253,6 @@ updated_df <- updated_df %>%
 
 updated_df <- updated_df %>% 
   mutate(subject = str_replace(subject, pattern="Drawing and Painting", replacement ="Painting and Drawing"))
+
 
 write_csv(updated_df, "data/supercleaned_artschool_df.csv")
